@@ -50,7 +50,7 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none overflow-hidden font-sans">
-      
+
       {/* --------------------------------- */}
       {/* MOBILE HUD (Ultra Minimal)        */}
       {/* --------------------------------- */}
@@ -63,7 +63,7 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
               <span className="text-[10px] font-bold text-white/50 tracking-widest">KM/H</span>
               <span className="text-2xl font-black text-purple-400 ml-2">G{telemetry.gear}</span>
             </div>
-            
+
             {/* Right: Score & Audio Toggles */}
             <div className="text-right flex flex-col items-end gap-2 pointer-events-auto">
               <span className="text-2xl font-black text-white drop-shadow-md tabular-nums">{Math.floor(telemetry.score).toLocaleString()}</span>
@@ -93,16 +93,16 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
       {/* --------------------------------- */}
       {/* DESKTOP HUD                       */}
       {/* --------------------------------- */}
-      
+
       {/* Top Right Buttons */}
       <div className="hidden md:flex absolute top-12 right-12 flex-col gap-4 pointer-events-auto z-40 items-end">
-        <button 
+        <button
           onClick={handleMusicToggle}
           className={`px-6 py-3 rounded-xl border-2 font-black tracking-widest transition-all ${musicOn ? 'bg-purple-600/20 border-purple-500 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.5)]' : 'bg-black/50 border-white/10 text-white/50'}`}
         >
           {musicOn ? 'MUSIC: ON' : 'MUSIC: OFF'}
         </button>
-        <button 
+        <button
           onClick={handleEngineSoundToggle}
           className={`px-6 py-3 rounded-xl border-2 font-black tracking-widest transition-all ${engineSoundOn ? 'bg-red-600/20 border-red-500 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-black/50 border-white/10 text-white/50'}`}
         >
@@ -112,11 +112,11 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
 
       {!started && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#0c0c12]/90 backdrop-blur-xl pointer-events-auto z-50 transition-opacity duration-500">
-          <div className="text-center flex flex-col items-center">
-            <h1 className="text-5xl font-black text-white mb-2 tracking-[0.2em] drop-shadow-2xl">APEX DYNAMICS</h1>
-            <p className="text-white/50 tracking-[0.3em] text-sm mb-12">MANUAL TRANSMISSION SIMULATOR</p>
+          <div className="text-center flex flex-col items-center px-4">
+            <h1 className="text-3xl md:text-5xl font-black text-white mb-2 tracking-[0.2em] drop-shadow-2xl">Yashu's</h1>
+            <p className="text-white/50 tracking-[0.3em] text-[10px] md:text-sm mb-8 md:mb-12">MANUAL TRANSMISSION SIMULATOR</p>
 
-            <div className="flex gap-4 mb-12">
+            <div className="flex flex-col md:flex-row gap-4 mb-8 md:mb-12">
               {[
                 { id: 0, name: "MODERN SUPERCAR", desc: "Dual-clutch, high pitch whine" },
                 { id: 1, name: "CLASSIC MUSCLE", desc: "Heavy clacks, deep bass" },
@@ -126,8 +126,8 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
                   key={car.id}
                   onClick={() => setSelectedCar(car.id)}
                   className={`p-6 border-2 rounded-xl text-left w-64 transition-all duration-300 ${selectedCar === car.id
-                      ? 'border-red-500 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.3)]'
-                      : 'border-white/10 hover:border-white/30 bg-black/50'
+                    ? 'border-red-500 bg-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.3)]'
+                    : 'border-white/10 hover:border-white/30 bg-black/50'
                     }`}
                 >
                   <h3 className="text-white font-black tracking-widest mb-2">{car.name}</h3>
@@ -138,7 +138,7 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
 
             <button
               onClick={handleStart}
-              className="px-12 py-5 bg-red-600 hover:bg-red-500 text-white text-lg font-black rounded-sm tracking-[0.3em] transition-all duration-300 shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:shadow-[0_0_50px_rgba(220,38,38,0.8)] border border-red-400/30"
+              className="px-8 py-4 md:px-12 md:py-5 bg-red-600 hover:bg-red-500 text-white text-base md:text-lg font-black rounded-sm tracking-[0.3em] transition-all duration-300 shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:shadow-[0_0_50px_rgba(220,38,38,0.8)] border border-red-400/30"
             >
               START ENGINE
             </button>
@@ -152,7 +152,7 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
           <div className="text-center flex flex-col items-center">
             <h1 className="text-6xl font-black text-red-600 mb-2 tracking-[0.2em] drop-shadow-[0_0_20px_rgba(220,38,38,0.8)]">CRITICAL FAILURE</h1>
             <p className="text-white/50 tracking-[0.3em] text-sm mb-12">ENGINE DESTROYED</p>
-            
+
             <div className="flex gap-12 mb-12 text-left">
               <div>
                 <span className="block text-xs text-white/40 tracking-[0.2em] font-bold mb-1">FINAL SCORE</span>
@@ -250,15 +250,15 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
           </div>
         </div>
       </div>
-      
+
       {/* Nitro & HP Bars */}
       <div className="hidden md:flex absolute bottom-12 left-12 w-64 bg-black/40 p-6 rounded-3xl backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex-col gap-4">
-        
+
         {/* HP Bar */}
         <div>
           <span className="text-xs text-white/40 tracking-[0.2em] font-bold block mb-2">VEHICLE INTEGRITY</span>
           <div className="w-full h-3 bg-black rounded-full overflow-hidden border border-white/10">
-            <div 
+            <div
               className={`h-full transition-all duration-300 ${telemetry.hp > 50 ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.8)]' : telemetry.hp > 25 ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.8)]' : 'bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.8)]'}`}
               style={{ width: `${telemetry.hp}%` }}
             />
@@ -269,7 +269,7 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
         <div>
           <span className="text-xs text-white/40 tracking-[0.2em] font-bold block mb-2">N2O BOOST</span>
           <div className="w-full h-3 bg-black rounded-full overflow-hidden border border-white/10">
-            <div 
+            <div
               className="h-full bg-cyan-400 transition-all duration-75 shadow-[0_0_15px_rgba(34,211,238,0.8)]"
               style={{ width: `${telemetry.nitro}%` }}
             />
@@ -280,19 +280,19 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
 
       {/* Mobile Touch Controls Overlay */}
       {started && (
-        <div className="absolute inset-x-0 bottom-8 h-48 pointer-events-none z-30 flex md:hidden justify-between px-4">
-          
+        <div className="absolute inset-x-0 bottom-24 h-48 pointer-events-none z-30 flex md:hidden justify-between px-2">
+
           {/* Left Thumb: Steering */}
-          <div className="flex gap-4 items-end pointer-events-auto">
-            <button 
-              className="w-20 h-20 bg-white/10 active:bg-white/30 backdrop-blur-md rounded-2xl border border-white/20 flex items-center justify-center text-3xl text-white select-none"
+          <div className="flex gap-2 items-end pointer-events-auto">
+            <button
+              className="w-16 h-16 sm:w-20 sm:h-20 bg-white/10 active:bg-white/30 backdrop-blur-md rounded-2xl border border-white/20 flex items-center justify-center text-3xl text-white select-none"
               onTouchStart={dispatchTouch('left', true)} onTouchEnd={dispatchTouch('left', false)}
               onMouseDown={dispatchTouch('left', true)} onMouseUp={dispatchTouch('left', false)}
             >
               {'<'}
             </button>
-            <button 
-              className="w-20 h-20 bg-white/10 active:bg-white/30 backdrop-blur-md rounded-2xl border border-white/20 flex items-center justify-center text-3xl text-white select-none"
+            <button
+              className="w-16 h-16 sm:w-20 sm:h-20 bg-white/10 active:bg-white/30 backdrop-blur-md rounded-2xl border border-white/20 flex items-center justify-center text-3xl text-white select-none"
               onTouchStart={dispatchTouch('right', true)} onTouchEnd={dispatchTouch('right', false)}
               onMouseDown={dispatchTouch('right', true)} onMouseUp={dispatchTouch('right', false)}
             >
@@ -301,41 +301,41 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
           </div>
 
           {/* Right Thumb: Pedals & Gears */}
-          <div className="flex flex-col gap-4 pointer-events-auto justify-end">
-            <div className="flex gap-4 justify-end">
-              <button 
-                className="w-16 h-16 bg-red-600/30 active:bg-red-600/60 backdrop-blur-md rounded-2xl border border-red-500/50 flex items-center justify-center font-bold text-white select-none"
+          <div className="flex flex-col gap-2 sm:gap-4 pointer-events-auto justify-end">
+            <div className="flex gap-2 sm:gap-4 justify-end">
+              <button
+                className="w-12 h-12 sm:w-16 sm:h-16 bg-red-600/30 active:bg-red-600/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-red-500/50 flex items-center justify-center font-bold text-xs sm:text-base text-white select-none"
                 onTouchStart={dispatchTouch('shiftDown', true)} onTouchEnd={dispatchTouch('shiftDown', false)}
                 onMouseDown={dispatchTouch('shiftDown', true)} onMouseUp={dispatchTouch('shiftDown', false)}
               >
                 G-
               </button>
-              <button 
-                className="w-16 h-16 bg-green-500/30 active:bg-green-500/60 backdrop-blur-md rounded-2xl border border-green-400/50 flex items-center justify-center font-bold text-white select-none"
+              <button
+                className="w-12 h-12 sm:w-16 sm:h-16 bg-green-500/30 active:bg-green-500/60 backdrop-blur-md rounded-xl sm:rounded-2xl border border-green-400/50 flex items-center justify-center font-bold text-xs sm:text-base text-white select-none"
                 onTouchStart={dispatchTouch('shiftUp', true)} onTouchEnd={dispatchTouch('shiftUp', false)}
                 onMouseDown={dispatchTouch('shiftUp', true)} onMouseUp={dispatchTouch('shiftUp', false)}
               >
                 G+
               </button>
-              <button 
-                className="w-16 h-16 bg-cyan-500/30 active:bg-cyan-500/60 backdrop-blur-md rounded-full border border-cyan-400/50 flex items-center justify-center font-bold text-white select-none"
+              <button
+                className="w-12 h-12 sm:w-16 sm:h-16 bg-cyan-500/30 active:bg-cyan-500/60 backdrop-blur-md rounded-full border border-cyan-400/50 flex items-center justify-center font-bold text-xs sm:text-base text-white select-none"
                 onTouchStart={dispatchTouch('nitro', true)} onTouchEnd={dispatchTouch('nitro', false)}
                 onMouseDown={dispatchTouch('nitro', true)} onMouseUp={dispatchTouch('nitro', false)}
               >
                 N2O
               </button>
             </div>
-            
-            <div className="flex gap-4 justify-end">
-              <button 
-                className="w-20 h-32 bg-red-500/20 active:bg-red-500/50 backdrop-blur-md rounded-3xl border border-red-500/30 flex items-center justify-center font-black tracking-widest text-white select-none"
+
+            <div className="flex gap-2 sm:gap-4 justify-end">
+              <button
+                className="w-16 h-24 sm:w-20 sm:h-32 bg-red-500/20 active:bg-red-500/50 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-red-500/30 flex items-center justify-center font-black tracking-widest text-xs sm:text-base text-white select-none"
                 onTouchStart={dispatchTouch('backward', true)} onTouchEnd={dispatchTouch('backward', false)}
                 onMouseDown={dispatchTouch('backward', true)} onMouseUp={dispatchTouch('backward', false)}
               >
                 BRK
               </button>
-              <button 
-                className="w-24 h-32 bg-white/20 active:bg-white/40 backdrop-blur-md rounded-3xl border border-white/30 flex items-center justify-center font-black tracking-widest text-white select-none"
+              <button
+                className="w-20 h-24 sm:w-24 sm:h-32 bg-white/20 active:bg-white/40 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-white/30 flex items-center justify-center font-black tracking-widest text-xs sm:text-base text-white select-none"
                 onTouchStart={dispatchTouch('forward', true)} onTouchEnd={dispatchTouch('forward', false)}
                 onMouseDown={dispatchTouch('forward', true)} onMouseUp={dispatchTouch('forward', false)}
               >
