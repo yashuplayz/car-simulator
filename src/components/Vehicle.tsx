@@ -14,6 +14,7 @@ export const Vehicle: React.FC = () => {
   const score = useRef(0);
   const nitroAmount = useRef(100);
   const hp = useRef(100);
+  const slipstreamAmount = useRef(0);
 
   // Transmission State
   // Gears: -1 (Reverse), 0 (Neutral), 1-6 (Forward)
@@ -72,13 +73,22 @@ export const Vehicle: React.FC = () => {
       score.current += 100;
       nitroAmount.current = Math.min(100, nitroAmount.current + 20);
     };
+    
+    const handleSlipstream = () => {
+      slipstreamAmount.current = Math.min(1.0, slipstreamAmount.current + 0.05);
+      score.current += 2;
+      nitroAmount.current = Math.min(100, nitroAmount.current + 0.2); // Rapid recharge
+    };
+
     window.addEventListener('near-miss', handleNearMiss);
+    window.addEventListener('slipstream-tick', handleSlipstream);
 
     return () => {
       unsubVel();
       unsubPos();
       unsubQuat();
       window.removeEventListener('near-miss', handleNearMiss);
+      window.removeEventListener('slipstream-tick', handleSlipstream);
     };
   }, [chassisApi]);
 
@@ -156,9 +166,11 @@ export const Vehicle: React.FC = () => {
     // We update the vehicle configuration internally in cannon
   }, []);
 
-  // Frame logic
   useFrame((_, delta) => {
     const engineOn = engineSound.engineOn;
+    
+    // Decay slipstream over time
+    slipstreamAmount.current = Math.max(0, slipstreamAmount.current - (delta * 0.5));
 
     // Handle Smoke Effects
     if (hp.current < 30) {
@@ -278,6 +290,10 @@ export const Vehicle: React.FC = () => {
           // Torque curve (simple linear drop off at high RPM)
           const torqueMultiplier = Math.max(0.1, 1.0 - (calcRpm / 8000));
           engineForce = gearTorqueLimit * gearRatio * finalDriveRatio * torqueMultiplier;
+          
+          if (slipstreamAmount.current > 0) {
+            engineForce *= (1.0 + (slipstreamAmount.current * 0.5)); // Up to 50% power boost
+          }
           
           if (isNitroActive) {
             engineForce *= 3.0; // Massive boost

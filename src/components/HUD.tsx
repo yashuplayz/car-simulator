@@ -1,6 +1,6 @@
 import { engineSound } from '../audio/EngineSound';
 import { music } from '../audio/Music';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface HUDProps {
   onStartEngine: () => void;
@@ -13,9 +13,36 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
   const [musicOn, setMusicOn] = useState(false);
   const [engineSoundOn, setEngineSoundOn] = useState(true);
 
+  const accState = useRef({
+    startTime: 0,
+    time100: null as number | null,
+    time200: null as number | null,
+    time300: null as number | null,
+    current: 0
+  });
+
   useEffect(() => {
     const handleTelemetry = (e: any) => {
       setTelemetry(e.detail);
+
+      const speed = Math.abs(e.detail.speed);
+      const now = Date.now();
+      const s = accState.current;
+
+      if (speed < 1) {
+        s.startTime = 0;
+        s.time100 = null;
+        s.time200 = null;
+        s.time300 = null;
+        s.current = 0;
+      } else if (s.startTime === 0 && speed >= 1) {
+        s.startTime = now;
+      } else if (s.startTime > 0) {
+        s.current = (now - s.startTime) / 1000;
+        if (speed >= 100 && s.time100 === null) s.time100 = s.current;
+        if (speed >= 200 && s.time200 === null) s.time200 = s.current;
+        if (speed >= 300 && s.time300 === null) s.time300 = s.current;
+      }
     };
     window.addEventListener('telemetry', handleTelemetry);
     return () => window.removeEventListener('telemetry', handleTelemetry);
@@ -108,6 +135,36 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
         >
           {engineSoundOn ? 'ENGINE AUDIO: ON' : 'ENGINE AUDIO: OFF'}
         </button>
+
+        {/* Acceleration Timers */}
+        <div className="bg-black/40 p-6 rounded-3xl backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col gap-3 mt-4 pointer-events-none text-left min-w-[220px]">
+          <div>
+            <span className="text-[10px] text-white/40 tracking-[0.2em] font-bold block mb-1">0-100 KM/H</span>
+            <span className={`text-xl font-black tabular-nums tracking-widest ${accState.current.time100 ? 'text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.8)]' : 'text-white/20'}`}>
+              {accState.current.time100 ? accState.current.time100.toFixed(2) + 's' : '--'}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-white/40 tracking-[0.2em] font-bold block mb-1">0-200 KM/H</span>
+            <span className={`text-xl font-black tabular-nums tracking-widest ${accState.current.time200 ? 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]' : 'text-white/20'}`}>
+              {accState.current.time200 ? accState.current.time200.toFixed(2) + 's' : '--'}
+            </span>
+          </div>
+          <div>
+            <span className="text-[10px] text-white/40 tracking-[0.2em] font-bold block mb-1">0-300 KM/H</span>
+            <span className={`text-xl font-black tabular-nums tracking-widest ${accState.current.time300 ? 'text-red-400 drop-shadow-[0_0_10px_rgba(248,113,113,0.8)]' : 'text-white/20'}`}>
+              {accState.current.time300 ? accState.current.time300.toFixed(2) + 's' : '--'}
+            </span>
+          </div>
+          
+          {/* Active Timer showing current run if not finished */}
+          <div className="mt-1 pt-3 border-t border-white/10">
+            <span className="text-[10px] text-white/40 tracking-[0.2em] font-bold block mb-1">CURRENT RUN</span>
+            <span className={`text-2xl font-black tabular-nums tracking-widest ${accState.current.startTime > 0 && !accState.current.time300 ? 'text-white' : 'text-white/20'}`}>
+              {accState.current.startTime > 0 ? accState.current.current.toFixed(2) + 's' : '0.00s'}
+            </span>
+          </div>
+        </div>
       </div>
 
       {!started && (

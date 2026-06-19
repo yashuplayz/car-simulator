@@ -1,6 +1,7 @@
 import React, { useMemo, useRef } from 'react';
 import { useBox } from '@react-three/cannon';
 import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 
 interface TrafficCarProps {
   position: [number, number, number];
@@ -8,90 +9,113 @@ interface TrafficCarProps {
 }
 
 const TrafficCar: React.FC<TrafficCarProps> = ({ position, color }) => {
-  // We use a simple box physics body for dummy cars.
-  // We give them a heavy mass so they behave like real parked cars if you hit them!
   const [ref, api] = useBox(() => ({
-    mass: 1500, 
+    type: 'Kinematic',
     args: [1.8, 1.2, 4.2], // Standard car dimensions
     position,
-    allowSleep: true, // Crucial for performance: disables physics calculations until you hit them
-    sleepSpeedLimit: 1.0,
-    sleepTimeLimit: 1.0,
-    linearDamping: 0.9, // So they slide to a halt if you punt them
-    angularDamping: 0.9,
   }));
 
   const localPos = useRef(position);
   const nearMissTriggered = useRef(false);
-  const speed = useRef(Math.random() * 15 + 15); // 15 to 30 m/s (54 to 108 km/h)
+  const speed = useRef(Math.random() * 15 + 15); // 15 to 30 m/s
+  const lanes = [-6, -2, 2, 6];
+  const targetLane = useRef(position[0]);
+  const isBraking = useRef(false);
+  
+  const nextLaneSwitch = useRef(Math.random() * 10);
+  const nextBrakeCheck = useRef(Math.random() * 20);
 
-  // Subscribe to position updates so we know where this body actually is
+  const tailLightMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0x440000 }), []);
+
   React.useEffect(() => {
     const unsub = api.position.subscribe((p) => (localPos.current = p as [number, number, number]));
     return unsub;
   }, [api.position]);
 
-  // Infinite Traffic Chunking & Driving AI
-  useFrame(({ camera }) => {
+  useFrame(({ camera, clock }) => {
     const playerZ = camera.position.z;
     const myZ = localPos.current[2];
+    const t = clock.elapsedTime;
 
-    // AI Driving: Apply forward velocity constantly
-    api.velocity.set(0, 0, -speed.current);
+    // AI Decision Making
+    if (t > nextLaneSwitch.current) {
+      nextLaneSwitch.current = t + 5 + Math.random() * 10;
+      const currentLaneIdx = lanes.indexOf(targetLane.current);
+      if (currentLaneIdx !== -1) {
+        const moveLeft = Math.random() > 0.5;
+        if (moveLeft && currentLaneIdx > 0) targetLane.current = lanes[currentLaneIdx - 1];
+        else if (!moveLeft && currentLaneIdx < lanes.length - 1) targetLane.current = lanes[currentLaneIdx + 1];
+      }
+    }
+    
+    if (t > nextBrakeCheck.current && !isBraking.current) {
+      nextBrakeCheck.current = t + 10 + Math.random() * 20;
+      isBraking.current = true;
+      setTimeout(() => isBraking.current = false, 1000 + Math.random() * 2000);
+    }
 
-    // Near Miss Detection
-    // The player's car is roughly at camera.position.x, and camera.position.z - 8
-    const playerDist = Math.hypot(camera.position.x - localPos.current[0], (camera.position.z - 8) - localPos.current[2]);
+    // Update Visuals
+    tailLightMat.color.setHex(isBraking.current ? 0xff0000 : 0x440000);
+
+    // Apply Velocity
+    const currentSpeed = isBraking.current ? speed.current * 0.6 : speed.current;
+    const xDiff = targetLane.current - localPos.current[0];
+    const vx = xDiff * 2.0; // Smooth steering into target lane
+    api.velocity.set(vx, 0, -currentSpeed);
+
+    // Near Miss & Slipstream Detection
+    const pX = camera.position.x;
+    const pZ = camera.position.z - 8;
+    const cX = localPos.current[0];
+    const cZ = localPos.current[2];
+    
+    const playerXDiff = pX - cX;
+    const zDiff = pZ - cZ;
+    const playerDist = Math.hypot(playerXDiff, zDiff);
+
     if (playerDist < 4.0 && playerDist > 1.8 && !nearMissTriggered.current) {
       nearMissTriggered.current = true;
       window.dispatchEvent(new CustomEvent('near-miss'));
     }
+    if (playerDist > 10.0) nearMissTriggered.current = false;
 
-    // Reset trigger if far away
-    if (playerDist > 10.0) {
-      nearMissTriggered.current = false;
+    // Slipstream: Player is strictly behind the car (zDiff is positive) and within the same lane (playerXDiff is small)
+    if (zDiff > 4.0 && zDiff < 25.0 && Math.abs(playerXDiff) < 1.5) {
+      window.dispatchEvent(new CustomEvent('slipstream-tick'));
     }
 
-    // If the car is 100 meters BEHIND the player, teleport it 4000 meters AHEAD
+    // Teleport logic
     if (myZ > playerZ + 100) {
-      const lanes = [-6, -2, 2, 6];
       const newX = lanes[Math.floor(Math.random() * lanes.length)];
       const newZ = playerZ - 3000 - (Math.random() * 1000);
       
       api.position.set(newX, 0.6, newZ);
+      targetLane.current = newX;
       api.velocity.set(0, 0, -speed.current);
       api.angularVelocity.set(0, 0, 0);
       nearMissTriggered.current = false;
+      isBraking.current = false;
     }
   });
 
   return (
     <group ref={ref as any}>
-      {/* Main Body / Chassis */}
       <mesh castShadow receiveShadow position={[0, -0.2, 0]}>
         <boxGeometry args={[1.8, 0.6, 4.2]} />
         <meshStandardMaterial color={color} roughness={0.5} metalness={0.6} />
       </mesh>
-      
-      {/* Cabin / Roof */}
       <mesh castShadow receiveShadow position={[0, 0.4, -0.4]}>
         <boxGeometry args={[1.4, 0.6, 2.0]} />
         <meshStandardMaterial color={color} roughness={0.5} metalness={0.6} />
       </mesh>
-
-      {/* Windshield */}
       <mesh position={[0, 0.4, 0.61]} rotation={[-Math.PI / 4, 0, 0]}>
         <planeGeometry args={[1.2, 0.8]} />
         <meshStandardMaterial color="#111" roughness={0.1} metalness={0.8} />
       </mesh>
-
-      {/* Rear Window */}
       <mesh position={[0, 0.4, -1.41]} rotation={[Math.PI / 4, 0, 0]}>
         <planeGeometry args={[1.2, 0.8]} />
         <meshStandardMaterial color="#111" roughness={0.1} metalness={0.8} />
       </mesh>
-
-      {/* Spoiler */}
       <mesh castShadow position={[0, 0.5, -1.8]}>
         <boxGeometry args={[1.6, 0.1, 0.4]} />
         <meshStandardMaterial color="#111" roughness={0.8} metalness={0.2} />
@@ -104,8 +128,6 @@ const TrafficCar: React.FC<TrafficCarProps> = ({ position, color }) => {
         <boxGeometry args={[0.1, 0.6, 0.2]} />
         <meshStandardMaterial color="#111" roughness={0.8} metalness={0.2} />
       </mesh>
-
-      {/* Headlights */}
       <mesh position={[-0.6, -0.1, 2.11]}>
         <planeGeometry args={[0.4, 0.2]} />
         <meshBasicMaterial color="#ffffff" />
@@ -114,15 +136,11 @@ const TrafficCar: React.FC<TrafficCarProps> = ({ position, color }) => {
         <planeGeometry args={[0.4, 0.2]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
-
-      {/* Taillights */}
-      <mesh position={[-0.6, -0.1, -2.11]} rotation={[0, Math.PI, 0]}>
+      <mesh position={[-0.6, -0.1, -2.11]} rotation={[0, Math.PI, 0]} material={tailLightMat}>
         <planeGeometry args={[0.4, 0.2]} />
-        <meshBasicMaterial color="#ff0000" />
       </mesh>
-      <mesh position={[0.6, -0.1, -2.11]} rotation={[0, Math.PI, 0]}>
+      <mesh position={[0.6, -0.1, -2.11]} rotation={[0, Math.PI, 0]} material={tailLightMat}>
         <planeGeometry args={[0.4, 0.2]} />
-        <meshBasicMaterial color="#ff0000" />
       </mesh>
     </group>
   );
