@@ -39,7 +39,100 @@ const InfiniteBuilding = ({ initialPosition, size, color, isNeon }: { initialPos
   );
 };
 
+const Rain = ({ isRaining }: { isRaining: boolean }) => {
+  const rainGeo = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const vertices = [];
+    for(let i=0; i<8000; i++) {
+      vertices.push(
+        Math.random() * 400 - 200, 
+        Math.random() * 200,       
+        Math.random() * 400 - 200  
+      );
+    }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    return geo;
+  }, []);
+
+  const material = useMemo(() => new THREE.PointsMaterial({
+    color: '#aaddff',
+    size: 0.4,
+    transparent: true,
+    opacity: 0
+  }), []);
+
+  const pointsRef = useRef<THREE.Points>(null);
+
+  useFrame((state, delta) => {
+    if (!pointsRef.current) return;
+    
+    // Fade in/out
+    material.opacity = THREE.MathUtils.lerp(material.opacity, isRaining ? 0.6 : 0, delta * 2);
+    
+    if (material.opacity < 0.01) return; // Don't animate if invisible
+
+    const positions = pointsRef.current.geometry.attributes.position.array as Float32Array;
+    const playerZ = state.camera.position.z;
+    
+    pointsRef.current.position.z = playerZ - 100;
+    
+    for(let i=1; i<positions.length; i+=3) {
+      positions[i] -= delta * 150; // fall speed
+      if (positions[i] < 0) {
+        positions[i] = 200;
+      }
+    }
+    pointsRef.current.geometry.attributes.position.needsUpdate = true;
+  });
+
+  return <points ref={pointsRef} geometry={rainGeo} material={material} />;
+};
+
+const CollectibleRing = ({ initialZ, lane }: { initialZ: number, lane: number }) => {
+  const ref = useRef<THREE.Mesh>(null);
+  const collected = useRef(false);
+
+  useFrame(({ camera }, delta) => {
+    if (!ref.current) return;
+    const pZ = camera.position.z;
+    const pX = camera.position.x;
+    
+    // Rotate ring
+    ref.current.rotation.y += delta * 2;
+
+    const rZ = ref.current.position.z;
+    const rX = ref.current.position.x;
+
+    // Collision check
+    if (!collected.current && Math.abs(pZ - rZ) < 2 && Math.abs(pX - rX) < 1.5) {
+       collected.current = true;
+       ref.current.visible = false;
+       window.dispatchEvent(new CustomEvent('collect-cash'));
+    }
+
+    // Recycle
+    if (rZ > pZ + 10) {
+       // Move way ahead
+       ref.current.position.z = pZ - 500 - Math.random() * 2000;
+       ref.current.position.x = [-6, -2, 2, 6][Math.floor(Math.random() * 4)];
+       collected.current = false;
+       ref.current.visible = true;
+    }
+  });
+
+  return (
+    <mesh ref={ref} position={[lane, 1.5, initialZ]}>
+      <torusGeometry args={[0.8, 0.15, 16, 32]} />
+      <meshBasicMaterial color="#00ff00" />
+    </mesh>
+  );
+};
+
 export const Scene: React.FC = () => {
+  const [isRaining, setIsRaining] = React.useState(false);
+  const nextWeatherChange = useRef(15); 
+  const isRainingRef = useRef(false); // Ref to prevent double dispatches
+  
   // Ground physics body
   const [ref] = usePlane(() => ({
     rotation: [-Math.PI / 2, 0, 0],
@@ -93,16 +186,32 @@ export const Scene: React.FC = () => {
   }, []);
 
   const dirLightRef = useRef<THREE.DirectionalLight>(null);
+  const synthwaveRoadMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ff00ff', wireframe: true, transparent: true, opacity: 0 }), []);
   
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const t = state.clock.elapsedTime * 0.05; // Day cycle speed
     const cycle = Math.sin(t); // 1 is midnight, -1 is midday
     
-    // Day = #87CEEB, Sunset = #fd5e53, Night = #050510
+    // Weather logic
+    if (state.clock.elapsedTime > nextWeatherChange.current) {
+      nextWeatherChange.current = state.clock.elapsedTime + 30 + Math.random() * 30; // Every 30-60s
+      const newRainState = !isRainingRef.current;
+      isRainingRef.current = newRainState;
+      setIsRaining(newRainState);
+      window.dispatchEvent(new CustomEvent('weather-change', { detail: { isRaining: newRainState } }));
+    }
+
+    // Synthwave Neon Fade In at midnight (when cycle is close to 1)
+    const targetSynthOpacity = cycle > 0.7 ? (cycle - 0.7) * 3.33 : 0; 
+    synthwaveRoadMat.opacity = THREE.MathUtils.lerp(synthwaveRoadMat.opacity, targetSynthOpacity, delta);
+    
+    // Day = #87CEEB, Sunset = #fd5e53, Night = #050510 (or #2a0a2a for Synthwave)
     const skyColor = new THREE.Color();
     if (cycle > 0) {
-      // Sunset to Night
-      skyColor.lerpColors(new THREE.Color('#fd5e53'), new THREE.Color('#050510'), cycle);
+      // Sunset to Synthwave Night
+      const nightColor = new THREE.Color('#050510');
+      if (cycle > 0.7) nightColor.lerp(new THREE.Color('#2a0a2a'), (cycle - 0.7) * 3.33); // Purple tint
+      skyColor.lerpColors(new THREE.Color('#fd5e53'), nightColor, cycle);
     } else {
       // Midday to Sunset
       skyColor.lerpColors(new THREE.Color('#fd5e53'), new THREE.Color('#87CEEB'), Math.abs(cycle));
@@ -114,8 +223,10 @@ export const Scene: React.FC = () => {
       state.scene.background = skyColor;
     }
     
-    if (state.scene.fog) {
+    if (state.scene.fog instanceof THREE.Fog) {
       state.scene.fog.color.copy(skyColor);
+      // If it's raining, increase fog density (shorter far clip)
+      state.scene.fog.far = THREE.MathUtils.lerp(state.scene.fog.far, isRainingRef.current ? 150 : 400, delta);
     } else {
       state.scene.fog = new THREE.Fog(skyColor, 50, 400);
     }
@@ -148,10 +259,18 @@ export const Scene: React.FC = () => {
         shadow-camera-bottom={-100}
       />
       
+      <Rain isRaining={isRaining} />
+      
       {/* Asphalt Highway */}
       <mesh ref={ref as any} receiveShadow>
         <planeGeometry args={[40, 100000]} />
         <meshStandardMaterial color="#222222" roughness={0.9} metalness={0.1} />
+      </mesh>
+
+      {/* Synthwave Glowing Road Grid */}
+      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[40, 100000, 4, 10000]} />
+        <primitive object={synthwaveRoadMat} attach="material" />
       </mesh>
       
       {/* Outer Ground (grass/dirt) */}
@@ -161,15 +280,15 @@ export const Scene: React.FC = () => {
       </mesh>
 
       {/* Lane Markers (Center dashed lines) */}
-      <mesh position={[-10, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={[-10, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.5, 100000, 1, 10000]} />
         <meshBasicMaterial color="#ffffff" wireframe />
       </mesh>
-      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.5, 100000, 1, 10000]} />
         <meshBasicMaterial color="#eab308" wireframe /> {/* Yellow center line */}
       </mesh>
-      <mesh position={[10, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={[10, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[0.5, 100000, 1, 10000]} />
         <meshBasicMaterial color="#ffffff" wireframe />
       </mesh>
@@ -193,6 +312,11 @@ export const Scene: React.FC = () => {
           color={b.color}
           isNeon={b.color === '#0f3460'} 
         />
+      ))}
+
+      {/* Collectible Rings */}
+      {Array.from({ length: 20 }).map((_, i) => (
+        <CollectibleRing key={`ring-${i}`} initialZ={-200 - i * 150} lane={[-6, -2, 2, 6][i % 4]} />
       ))}
     </>
   );

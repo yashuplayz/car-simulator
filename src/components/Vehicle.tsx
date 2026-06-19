@@ -15,6 +15,9 @@ export const Vehicle: React.FC = () => {
   const nitroAmount = useRef(100);
   const hp = useRef(100);
   const slipstreamAmount = useRef(0);
+  const isRaining = useRef(false);
+  const wantedLevel = useRef(0);
+  const cash = useRef(0);
 
   // Transmission State
   // Gears: -1 (Reverse), 0 (Neutral), 1-6 (Forward)
@@ -72,6 +75,7 @@ export const Vehicle: React.FC = () => {
     const handleNearMiss = () => {
       score.current += 100;
       nitroAmount.current = Math.min(100, nitroAmount.current + 20);
+      wantedLevel.current = Math.min(5.0, wantedLevel.current + 0.5); // Add half a star per near miss
     };
     
     const handleSlipstream = () => {
@@ -80,8 +84,19 @@ export const Vehicle: React.FC = () => {
       nitroAmount.current = Math.min(100, nitroAmount.current + 0.2); // Rapid recharge
     };
 
+    const handleWeatherChange = (e: any) => {
+      isRaining.current = e.detail.isRaining;
+    };
+
+    const handleCollectCash = () => {
+      cash.current += 100;
+      score.current += 500;
+    };
+
     window.addEventListener('near-miss', handleNearMiss);
     window.addEventListener('slipstream-tick', handleSlipstream);
+    window.addEventListener('weather-change', handleWeatherChange);
+    window.addEventListener('collect-cash', handleCollectCash);
 
     return () => {
       unsubVel();
@@ -89,6 +104,8 @@ export const Vehicle: React.FC = () => {
       unsubQuat();
       window.removeEventListener('near-miss', handleNearMiss);
       window.removeEventListener('slipstream-tick', handleSlipstream);
+      window.removeEventListener('weather-change', handleWeatherChange);
+      window.removeEventListener('collect-cash', handleCollectCash);
     };
   }, [chassisApi]);
 
@@ -220,6 +237,13 @@ export const Vehicle: React.FC = () => {
     const speedMs = velocity.current.length(); // m/s
     const speedKmh = speedMs * 3.6;
 
+    // Wanted Level Logic
+    if (speedKmh > 200) {
+      wantedLevel.current = Math.min(5.0, wantedLevel.current + delta * 0.1); // Gain stars from speeding
+    } else if (speedKmh < 100) {
+      wantedLevel.current = Math.max(0, wantedLevel.current - delta * 0.2); // Lose stars if driving slow
+    }
+
     // Calculate RPM based on wheel speed (simplified as chassis forward velocity)
     // Forward velocity:
     const forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(chassisQuat.current);
@@ -338,10 +362,19 @@ export const Vehicle: React.FC = () => {
     // Smooth Racing Steering
     // Lowered max steering angle to prevent twitchy arcade movements
     const maxSteerVal = 0.15; // Reduced from 0.25 for less sensitivity
-    const targetSteerVal = controls.left ? -maxSteerVal : controls.right ? maxSteerVal : 0;
+    let targetSteerVal = controls.left ? -maxSteerVal : controls.right ? maxSteerVal : 0;
     
+    // Simulate slippery roads in the rain
+    if (isRaining.current && speedKmh > 100) {
+      engineForce *= 0.7; // 30% loss of power due to slipping tires
+      if (controls.left || controls.right) {
+         // Add random jitter to steering when turning in the rain at high speeds
+         targetSteerVal += (Math.random() - 0.5) * 0.05;
+      }
+    }
+
     // Very smooth, gradual lerp for high-speed stability
-    currentSteer.current = THREE.MathUtils.lerp(currentSteer.current, targetSteerVal, 0.02);
+    currentSteer.current = THREE.MathUtils.lerp(currentSteer.current, targetSteerVal, isRaining.current ? 0.01 : 0.02);
 
     vehicleApi.setSteeringValue(currentSteer.current, 0);
     vehicleApi.setSteeringValue(currentSteer.current, 1);
@@ -357,7 +390,9 @@ export const Vehicle: React.FC = () => {
         engineOn: engineOn,
         nitro: nitroAmount.current,
         score: score.current,
-        hp: hp.current
+        hp: hp.current,
+        wantedLevel: Math.floor(wantedLevel.current), // Send integer 0-5
+        cash: cash.current
       }
     });
     window.dispatchEvent(telemetryEvent);

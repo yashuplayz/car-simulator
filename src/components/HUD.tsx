@@ -9,7 +9,7 @@ interface HUDProps {
 export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
   const [started, setStarted] = useState(false);
   const [selectedCar, setSelectedCar] = useState(0);
-  const [telemetry, setTelemetry] = useState({ rpm: 0, speed: 0, gear: 'N', distance: 0, engineOn: false, nitro: 100, score: 0, hp: 100 });
+  const [telemetry, setTelemetry] = useState({ rpm: 0, speed: 0, gear: 'N', distance: 0, engineOn: false, nitro: 100, score: 0, hp: 100, wantedLevel: 0, cash: 0 });
   const [musicOn, setMusicOn] = useState(false);
   const [engineSoundOn, setEngineSoundOn] = useState(true);
 
@@ -84,16 +84,29 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
       {started && (
         <div className="absolute top-0 inset-x-0 p-2 flex flex-col gap-2 md:hidden pointer-events-none z-40 bg-gradient-to-b from-black/80 via-black/40 to-transparent pb-8">
           <div className="flex justify-between items-start px-2">
-            {/* Left: Speed & Gear */}
-            <div className="flex items-baseline gap-2 drop-shadow-lg">
-              <span className="text-4xl font-black text-white tabular-nums">{Math.floor(Math.abs(telemetry.speed))}</span>
-              <span className="text-[10px] font-bold text-white/50 tracking-widest">KM/H</span>
-              <span className="text-2xl font-black text-purple-400 ml-2">G{telemetry.gear}</span>
+            {/* Left: Speed, Gear & RPM */}
+            <div className="flex flex-col drop-shadow-lg">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-black text-white tabular-nums">{Math.floor(Math.abs(telemetry.speed))}</span>
+                <span className="text-[10px] font-bold text-white/50 tracking-widest">KM/H</span>
+                <span className="text-2xl font-black text-purple-400 ml-2">G{telemetry.gear}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`text-xs font-black tabular-nums tracking-widest ${isRedline ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'text-white'}`}>
+                  {Math.floor(telemetry.rpm)} RPM
+                </span>
+                <div className="h-1.5 w-16 bg-black/50 rounded-full overflow-hidden border border-white/10">
+                  <div className={`h-full transition-all duration-75 ${isRedline ? 'bg-red-500' : 'bg-white'}`} style={{ width: `${rpmRatio * 100}%` }} />
+                </div>
+              </div>
             </div>
 
-            {/* Right: Score & Audio Toggles */}
+            {/* Right: Score, Cash & Audio Toggles */}
             <div className="text-right flex flex-col items-end gap-2 pointer-events-auto">
-              <span className="text-2xl font-black text-white drop-shadow-md tabular-nums">{Math.floor(telemetry.score).toLocaleString()}</span>
+              <div className="flex flex-col items-end gap-0">
+                <span className="text-2xl font-black text-white drop-shadow-md tabular-nums">{Math.floor(telemetry.score).toLocaleString()}</span>
+                <span className="text-sm font-black text-green-400 drop-shadow-md tabular-nums">${telemetry.cash.toLocaleString()}</span>
+              </div>
               <div className="flex gap-2">
                 <button onClick={handleMusicToggle} className={`text-[9px] font-black px-2 py-1 rounded border tracking-widest ${musicOn ? 'bg-purple-600/30 border-purple-500 text-purple-200' : 'bg-black/50 border-white/20 text-white/50'}`}>
                   {musicOn ? 'MUS:ON' : 'MUS:OFF'}
@@ -105,6 +118,13 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
             </div>
           </div>
 
+          {/* Wanted Level Stars (Mobile) */}
+          <div className="px-2 mt-1 flex gap-1 justify-end">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <span key={star} className={`text-lg font-black drop-shadow-md transition-colors ${telemetry.wantedLevel >= star ? 'text-yellow-400' : 'text-white/20'}`}>★</span>
+            ))}
+          </div>
+
           {/* Thin Bars for HP and Nitro */}
           <div className="px-2 flex flex-col gap-1.5 mt-1">
             <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden border border-white/10">
@@ -113,6 +133,15 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
             <div className="h-1.5 w-full bg-black/50 rounded-full overflow-hidden border border-white/10">
               <div className="h-full bg-cyan-400 transition-all duration-75" style={{ width: `${telemetry.nitro}%` }} />
             </div>
+          </div>
+
+          {/* Mobile Extra Stats */}
+          <div className="px-2 mt-2 flex justify-between text-[9px] font-black tracking-[0.2em] text-white/60 drop-shadow-md">
+             <span>TRIP: {telemetry.distance.toFixed(1)} KM</span>
+             <span>
+               100: {accState.current.time100 ? accState.current.time100.toFixed(1) + 's' : '--'} 
+               {' | '}200: {accState.current.time200 ? accState.current.time200.toFixed(1) + 's' : '--'}
+             </span>
           </div>
         </div>
       )}
@@ -291,12 +320,26 @@ export const HUD: React.FC<HUDProps> = ({ onStartEngine }) => {
           </div>
         </div>
 
-        {/* Score & Odometer */}
+        {/* Score, Cash & Odometer */}
         <div className="bg-black/40 p-6 rounded-3xl backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col gap-4">
+          
+          {/* Wanted Level (Desktop) */}
+          <div className="flex gap-1 mb-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <span key={star} className={`text-2xl font-black drop-shadow-md transition-colors ${telemetry.wantedLevel >= star ? 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]' : 'text-white/20'}`}>★</span>
+            ))}
+          </div>
+
           <div>
             <span className="text-xs text-white/40 tracking-[0.2em] font-bold block mb-1">SCORE</span>
             <span className="text-3xl font-black text-purple-400 tabular-nums tracking-widest drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]">
               {Math.floor(telemetry.score).toLocaleString()}
+            </span>
+          </div>
+          <div>
+            <span className="text-xs text-white/40 tracking-[0.2em] font-bold block mb-1">CASH</span>
+            <span className="text-2xl font-black text-green-400 tabular-nums tracking-widest drop-shadow-[0_0_10px_rgba(74,222,128,0.8)]">
+              ${telemetry.cash.toLocaleString()}
             </span>
           </div>
           <div>

@@ -8,6 +8,13 @@ interface TrafficCarProps {
   color: string;
 }
 
+let globalWantedLevel = 0;
+let globalPlayerSpeed = 0;
+window.addEventListener('telemetry', (e: any) => {
+  globalWantedLevel = e.detail.wantedLevel;
+  globalPlayerSpeed = e.detail.speed;
+});
+
 const TrafficCar: React.FC<TrafficCarProps> = ({ position, color }) => {
   const [ref, api] = useBox(() => ({
     type: 'Kinematic',
@@ -24,8 +31,10 @@ const TrafficCar: React.FC<TrafficCarProps> = ({ position, color }) => {
   
   const nextLaneSwitch = useRef(Math.random() * 10);
   const nextBrakeCheck = useRef(Math.random() * 20);
+  const isPolice = useRef(false);
 
   const tailLightMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0x440000 }), []);
+  const policeLightMat = useMemo(() => new THREE.MeshBasicMaterial({ color: 0x0000ff, transparent: true, opacity: 0 }), []);
 
   React.useEffect(() => {
     const unsub = api.position.subscribe((p) => (localPos.current = p as [number, number, number]));
@@ -37,25 +46,47 @@ const TrafficCar: React.FC<TrafficCarProps> = ({ position, color }) => {
     const myZ = localPos.current[2];
     const t = clock.elapsedTime;
 
-    // AI Decision Making
-    if (t > nextLaneSwitch.current) {
-      nextLaneSwitch.current = t + 5 + Math.random() * 10;
-      const currentLaneIdx = lanes.indexOf(targetLane.current);
-      if (currentLaneIdx !== -1) {
-        const moveLeft = Math.random() > 0.5;
-        if (moveLeft && currentLaneIdx > 0) targetLane.current = lanes[currentLaneIdx - 1];
-        else if (!moveLeft && currentLaneIdx < lanes.length - 1) targetLane.current = lanes[currentLaneIdx + 1];
-      }
-    }
+    const pX = camera.position.x;
     
-    if (t > nextBrakeCheck.current && !isBraking.current) {
-      nextBrakeCheck.current = t + 10 + Math.random() * 20;
-      isBraking.current = true;
-      setTimeout(() => isBraking.current = false, 1000 + Math.random() * 2000);
-    }
+    // AI Decision Making
+    if (isPolice.current) {
+      // Aggressive ramming AI
+      let bestLane = lanes[0];
+      let minDist = Infinity;
+      for (let l of lanes) {
+        if (Math.abs(pX - l) < minDist) {
+          minDist = Math.abs(pX - l);
+          bestLane = l;
+        }
+      }
+      targetLane.current = bestLane;
+      
+      // Flashing Lights
+      const blink = Math.floor(t * 8) % 2 === 0;
+      tailLightMat.color.setHex(blink ? 0x0000ff : 0xff0000);
+      policeLightMat.color.setHex(blink ? 0xff0000 : 0x0000ff);
+      policeLightMat.opacity = 1;
+    } else {
+      policeLightMat.opacity = 0;
+      if (t > nextLaneSwitch.current) {
+        nextLaneSwitch.current = t + 5 + Math.random() * 10;
+        const currentLaneIdx = lanes.indexOf(targetLane.current);
+        if (currentLaneIdx !== -1) {
+          const moveLeft = Math.random() > 0.5;
+          if (moveLeft && currentLaneIdx > 0) targetLane.current = lanes[currentLaneIdx - 1];
+          else if (!moveLeft && currentLaneIdx < lanes.length - 1) targetLane.current = lanes[currentLaneIdx + 1];
+        }
+      }
+      
+      if (t > nextBrakeCheck.current && !isBraking.current) {
+        nextBrakeCheck.current = t + 10 + Math.random() * 20;
+        isBraking.current = true;
+        setTimeout(() => isBraking.current = false, 1000 + Math.random() * 2000);
+      }
 
-    // Update Visuals
-    tailLightMat.color.setHex(isBraking.current ? 0xff0000 : 0x440000);
+      // Update Visuals
+      tailLightMat.color.setHex(isBraking.current ? 0xff0000 : 0x440000);
+    }
 
     // Apply Velocity
     const currentSpeed = isBraking.current ? speed.current * 0.6 : speed.current;
@@ -64,7 +95,6 @@ const TrafficCar: React.FC<TrafficCarProps> = ({ position, color }) => {
     api.velocity.set(vx, 0, -currentSpeed);
 
     // Near Miss & Slipstream Detection
-    const pX = camera.position.x;
     const pZ = camera.position.z - 8;
     const cX = localPos.current[0];
     const cZ = localPos.current[2];
@@ -85,11 +115,31 @@ const TrafficCar: React.FC<TrafficCarProps> = ({ position, color }) => {
     }
 
     // Teleport logic
-    if (myZ > playerZ + 100) {
+    // We check playerZ + 200 because police can spawn behind up to +400. We don't want to despawn them instantly if they fall behind.
+    // So if myZ > playerZ + 600, despawn.
+    if (myZ > playerZ + 600) {
       const newX = lanes[Math.floor(Math.random() * lanes.length)];
-      const newZ = playerZ - 3000 - (Math.random() * 1000);
       
-      api.position.set(newX, 0.6, newZ);
+      let spawnAsPolice = false;
+      if (globalWantedLevel > 0 && Math.random() < (globalWantedLevel * 0.15)) {
+        spawnAsPolice = true;
+      }
+
+      if (spawnAsPolice) {
+         isPolice.current = true;
+         // Spawn behind the player to catch up
+         const newZ = playerZ + 300 + (Math.random() * 200);
+         api.position.set(newX, 0.6, newZ);
+         // If player is doing 300, police does 330
+         speed.current = Math.max(200 / 3.6, (globalPlayerSpeed + 30) / 3.6); 
+      } else {
+         isPolice.current = false;
+         // Spawn ahead
+         const newZ = playerZ - 3000 - (Math.random() * 1000);
+         api.position.set(newX, 0.6, newZ);
+         speed.current = (80 + Math.random() * 40) / 3.6;
+      }
+      
       targetLane.current = newX;
       api.velocity.set(0, 0, -speed.current);
       api.angularVelocity.set(0, 0, 0);
@@ -141,6 +191,11 @@ const TrafficCar: React.FC<TrafficCarProps> = ({ position, color }) => {
       </mesh>
       <mesh position={[0.6, -0.1, -2.11]} rotation={[0, Math.PI, 0]} material={tailLightMat}>
         <planeGeometry args={[0.4, 0.2]} />
+      </mesh>
+      
+      {/* Police Lightbar */}
+      <mesh position={[0, 0.75, 0]} material={policeLightMat}>
+        <boxGeometry args={[1.2, 0.1, 0.3]} />
       </mesh>
     </group>
   );
